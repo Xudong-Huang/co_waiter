@@ -1,9 +1,9 @@
 #[cfg_attr(test, macro_use)]
 extern crate may;
 
-use std::{fmt, io};
-use std::time::Duration;
 use std::sync::atomic::Ordering;
+use std::time::Duration;
+use std::{fmt, io};
 
 use may::coroutine;
 use may::sync::{AtomicOption, Blocker};
@@ -31,8 +31,8 @@ impl<T> Waiter<T> {
     }
 
     pub fn wait_rsp<D: Into<Option<Duration>>>(&self, timeout: D) -> io::Result<T> {
-        use io::{Error, ErrorKind};
         use coroutine::ParkError;
+        use io::{Error, ErrorKind};
 
         match self.blocker.park(timeout.into()) {
             Ok(_) => match self.rsp.take(Ordering::Acquire) {
