@@ -4,8 +4,8 @@ use std::hash::Hash;
 use std::io;
 use std::time::Duration;
 
+use crate::waiter::Waiter;
 use may::sync::Mutex;
-use crate::Waiter;
 
 #[derive(Debug)]
 pub struct WaiterGuard<'a, K: Hash + Eq + 'a, T: 'a> {
@@ -111,6 +111,7 @@ impl<K: Hash + Eq, T> WaiterMap<K, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use may::go;
 
     #[test]
     fn test_waiter_map() {
