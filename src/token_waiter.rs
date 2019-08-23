@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::fmt;
 use std::io;
 use std::pin::Pin;
@@ -6,9 +7,11 @@ use std::time::Duration;
 
 use crate::waiter::Waiter;
 
+thread_local! {static TAG: Cell<usize> = Cell::new(0);}
+
 pub struct TokenWaiter<T> {
-    key: AtomicUsize,
     waiter: Waiter<T>,
+    key: AtomicUsize,
 }
 
 impl<T> TokenWaiter<T> {
@@ -21,7 +24,13 @@ impl<T> TokenWaiter<T> {
 
     pub fn get_id(self: Pin<&Self>) -> usize {
         let address = self.get_ref() as *const _ as usize;
-        let id = address << 3;
+        let tag = TAG.with(|t| {
+            let x = t.get();
+            t.set(x + 1);
+            (x & 0x1f) << 1
+        });
+
+        let id = (address << 3) | tag;
         self.key.store(id, Ordering::Relaxed);
         id
     }
@@ -31,10 +40,7 @@ impl<T> TokenWaiter<T> {
         let id = *id;
         // TODO: how to check if the address is valid?
         // if the id is wrong enough we could get a SIGSEGV
-        let address = id >> 3;
-        if address & 3 != 0 {
-            return None;
-        }
+        let address = (id >> 3) & !0x7;
 
         let waiter = unsafe { &*(address as *const Self) };
         // need to check if the memory is still valid
@@ -90,19 +96,21 @@ mod tests {
 
     #[test]
     fn token_waiter() {
-        let result = go!(|| {
-            let waiter = TokenWaiter::<usize>::new();
-            let waiter = Pin::new(&waiter);
-            let id = waiter.get_id();
-            // trigger the rsp in another coroutine
-            go!(move || TokenWaiter::<usize>::set_rsp(id, 42));
-            // this will block until the rsp was set
-            waiter.wait_rsp(None).unwrap()
-        })
-        .join()
-        .unwrap();
+        for j in 0..100 {
+            let result = go!(move || {
+                let waiter = TokenWaiter::<usize>::new();
+                let waiter = Pin::new(&waiter);
+                let id = waiter.get_id();
+                // trigger the rsp in another coroutine
+                go!(move || TokenWaiter::<usize>::set_rsp(id, j));
+                // this will block until the rsp was set
+                waiter.wait_rsp(None).unwrap()
+            })
+            .join()
+            .unwrap();
 
-        assert_eq!(result, 42);
+            assert_eq!(result, j);
+        }
     }
 
     #[test]
