@@ -32,7 +32,7 @@ impl<T> Waiter<T> {
         match self.blocker.park(timeout.into()) {
             Ok(_) => match self.rsp.take(Ordering::Acquire) {
                 Some(rsp) => Ok(rsp),
-                None => panic!("unable to get the rsp, waiter={:p}", &self),
+                None => Err(Error::new(ErrorKind::Other, "unable to get the rsp")),
             },
             Err(ParkError::Timeout) => Err(Error::new(ErrorKind::TimedOut, "wait rsp timeout")),
             Err(ParkError::Canceled) => {
