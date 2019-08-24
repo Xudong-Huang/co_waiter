@@ -28,15 +28,21 @@ impl<T> Waiter<T> {
     pub fn wait_rsp<D: Into<Option<Duration>>>(&self, timeout: D) -> io::Result<T> {
         use coroutine::ParkError;
         use io::{Error, ErrorKind};
-
-        match self.blocker.park(timeout.into()) {
-            Ok(_) => match self.rsp.take(Ordering::Acquire) {
-                Some(rsp) => Ok(rsp),
-                None => Err(Error::new(ErrorKind::Other, "unable to get the rsp")),
-            },
-            Err(ParkError::Timeout) => Err(Error::new(ErrorKind::TimedOut, "wait rsp timeout")),
-            Err(ParkError::Canceled) => {
-                coroutine::trigger_cancel_panic();
+        let timeout = timeout.into();
+        loop {
+            match self.blocker.park(timeout) {
+                Ok(_) => match self.rsp.take(Ordering::Acquire) {
+                    Some(rsp) => return Ok(rsp),
+                    // None => Err(Error::new(ErrorKind::Other, "unable to get the rsp")),
+                    // false wakeup try again
+                    None => {}
+                },
+                Err(ParkError::Timeout) => {
+                    return Err(Error::new(ErrorKind::TimedOut, "wait rsp timeout"))
+                }
+                Err(ParkError::Canceled) => {
+                    coroutine::trigger_cancel_panic();
+                }
             }
         }
     }
