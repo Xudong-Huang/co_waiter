@@ -7,7 +7,7 @@ use may::sync::{AtomicOption, Blocker};
 
 pub struct Waiter<T> {
     blocker: Blocker,
-    rsp: AtomicOption<T>,
+    rsp: AtomicOption<Box<T>>,
 }
 
 impl<T> Waiter<T> {
@@ -20,7 +20,7 @@ impl<T> Waiter<T> {
 
     pub fn set_rsp(&self, rsp: T) {
         // set the response
-        self.rsp.swap(rsp, Ordering::Release);
+        self.rsp.swap(Box::new(rsp), Ordering::Release);
         // wake up the blocker
         self.blocker.unpark();
     }
@@ -31,12 +31,14 @@ impl<T> Waiter<T> {
         let timeout = timeout.into();
         loop {
             match self.blocker.park(timeout) {
-                Ok(_) => match self.rsp.take(Ordering::Acquire) {
-                    Some(rsp) => return Ok(rsp),
-                    // None => Err(Error::new(ErrorKind::Other, "unable to get the rsp")),
-                    // false wakeup try again
-                    None => {}
-                },
+                Ok(_) => {
+                    if let Some(rsp) = self.rsp.take(Ordering::Acquire) {
+                        return Ok(*rsp);
+                        // None => Err(Error::new(ErrorKind::Other, "unable to get the rsp")),
+                        // false wake up try again
+                        // None => {}
+                    }
+                }
                 Err(ParkError::Timeout) => {
                     return Err(Error::new(ErrorKind::TimedOut, "wait rsp timeout"))
                 }

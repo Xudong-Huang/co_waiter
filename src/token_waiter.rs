@@ -45,7 +45,11 @@ impl<T> TokenWaiter<T> {
         let waiter = unsafe { &*(address as *const Self) };
         // need to check if the memory is still valid
         // lock the key to protect contention with drop
-        if waiter.key.compare_and_swap(id, id + 1, Ordering::AcqRel) == id {
+        if waiter
+            .key
+            .compare_exchange(id, id + 1, Ordering::AcqRel, Ordering::Relaxed)
+            .is_ok()
+        {
             Some(waiter)
         } else {
             None
@@ -82,9 +86,13 @@ impl<T> Default for TokenWaiter<T> {
 impl<T> Drop for TokenWaiter<T> {
     fn drop(&mut self) {
         // wait for the key locked and clear it
-        let key = self.key.load(Ordering::Relaxed) & !1;
-        while self.key.compare_and_swap(key, 0, Ordering::AcqRel) != key {
-            std::sync::atomic::spin_loop_hint()
+        let mut key = self.key.load(Ordering::Relaxed) & !1;
+        while let Err(v) =
+            self.key
+                .compare_exchange_weak(key, 0, Ordering::AcqRel, Ordering::Relaxed)
+        {
+            key = v;
+            std::hint::spin_loop()
         }
     }
 }
