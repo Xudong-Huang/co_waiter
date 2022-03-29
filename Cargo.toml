@@ -1,8 +1,18 @@
 [package]
 name = "co_waiter"
-version = "0.1.0"
-edition = "2018"
+edition = "2021"
+version = "0.1.1"
 authors = ["Xudong Huang <huangxu008@hotmail.com>"]
+license = "MIT/Apache-2.0"
+repository = "https://github.com/Xudong-Huang/co_waiter.git"
+homepage = "https://github.com/Xudong-Huang/co_waiter.git"
+documentation = "https://docs.rs/co_waiter"
+description = "Simple coroutine communication blocker"
+readme = "README.md"
+keywords = ["coroutine", "multi-thread"]
+categories = ["concurrency"]
+exclude = [".gitignore", ".travis.yml", "appveyor.yml", "benches/**/*"]
 
 [dependencies]
 may = "0.3"
+dashmap = "5"

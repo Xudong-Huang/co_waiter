@@ -1,10 +1,11 @@
+use may::coroutine;
+use may::sync::{AtomicOption, Blocker};
+
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::{fmt, io};
 
-use may::coroutine;
-use may::sync::{AtomicOption, Blocker};
-
+/// Generic Waiter that could wait for a response
 pub struct Waiter<T> {
     blocker: Blocker,
     rsp: AtomicOption<Box<T>>,
@@ -26,8 +27,8 @@ impl<T> Waiter<T> {
     }
 
     pub fn wait_rsp<D: Into<Option<Duration>>>(&self, timeout: D) -> io::Result<T> {
-        use coroutine::ParkError;
-        use io::{Error, ErrorKind};
+        use may::coroutine::ParkError;
+        use std::io::{Error, ErrorKind};
         let timeout = timeout.into();
         loop {
             match self.blocker.park(timeout) {
@@ -47,6 +48,11 @@ impl<T> Waiter<T> {
                 }
             }
         }
+    }
+
+    pub fn cancel_wait(&self) {
+        // wake up the blocker without rsp
+        self.blocker.unpark()
     }
 }
 
