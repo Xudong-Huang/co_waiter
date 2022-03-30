@@ -6,7 +6,7 @@ use std::time::Duration;
 use std::{fmt, io};
 
 /// Generic Waiter that could wait for a response
-pub struct Waiter<T> {
+pub(crate) struct Waiter<T> {
     blocker: Blocker,
     rsp: AtomicOption<Box<T>>,
 }
